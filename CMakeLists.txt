@@ -2,13 +2,29 @@ cmake_minimum_required(VERSION 2.6)
 
 project(TA C CXX)# Fortran)
 
+if(SIMD)
+  message(STATUS "Adding SIMD")
+  add_definitions(-DWITH_SIMD)
+  add_definitions(-DWITH_SIMD_INCR)
+endif()
+
 # add a NativeRelease build type
-SET( CMAKE_CXX_FLAGS_NATIVERELEASE "-O3 -DNDEBUG -march=native -ftree-vectorize" CACHE STRING
-    "Flags used by the C++ compiler during native builds."
-    FORCE )
-SET( CMAKE_C_FLAGS_NATIVERELEASE "-O3 -DNDEBUG -march=native -ftree-vectorize" CACHE STRING
-    "Flags used by the C compiler during native builds."
-    FORCE )
+if(CMAKE_CXX_COMPILER MATCHES "icc$")
+  set( CMAKE_CXX_FLAGS_NATIVERELEASE "-O3 -DNDEBUG" CACHE STRING
+      "Flags used by the C++ compiler during native builds."
+      FORCE )
+  set( CMAKE_C_FLAGS_NATIVERELEASE "-O3 -DNDEBUG" CACHE STRING
+      "Flags used by the C compiler during native builds."
+      FORCE )
+elseif(CMAKE_CXX_COMPILER MATCHES "g\\+\\+\\-4\\.8$")
+  set( CMAKE_CXX_FLAGS_NATIVERELEASE "-O3 -DNDEBUG -march=native -ftree-vectorize" CACHE STRING
+      "Flags used by the C++ compiler during native builds."
+      FORCE )
+  set( CMAKE_C_FLAGS_NATIVERELEASE "-O3 -DNDEBUG -march=native -ftree-vectorize" CACHE STRING
+      "Flags used by the C compiler during native builds."
+      FORCE )
+endif()
+
 SET( CMAKE_EXE_LINKER_FLAGS_NATIVERELEASE "" CACHE STRING
     "Flags used for linking binaries during native builds."
     FORCE )
