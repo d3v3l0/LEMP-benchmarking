@@ -79,8 +79,8 @@ ENDIF(CMAKE_COMPILER_IS_GNUCXX)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
 # my own includes/libs
-# #include_directories(~/local/include)
-#link_directories(~/local/lib)
+include_directories(~/packages/include)
+link_directories(~/packages/lib)
 
 
 
@@ -119,8 +119,8 @@ endif()
 
 
 
-find_package(Armadillo 3.6.0 REQUIRED)
-include_directories(${ARMADILLO_INCLUDE_DIRS})
+#find_package(Armadillo 3.6.0 REQUIRED)
+#include_directories(${ARMADILLO_INCLUDE_DIRS})
 
 find_package(LibXml2 2.6.0 REQUIRED)
 include_directories(${LIBXML2_INCLUDE_DIR})
