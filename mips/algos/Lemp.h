@@ -165,7 +165,6 @@ namespace mips {
             std::cout << "[RETRIEVAL] ... and is finished with " << totalSize << " results" << std::endl;
             logging << totalSize << "\t";
 
-            outputStats();
         }
 
         inline void runTopK(VectorMatrix& leftMatrix, Results& results) {
@@ -257,7 +256,6 @@ namespace mips {
 //             std::cout << "TOTAL ERROR: " << totalError / leftMatrix.rowNum << " countABOVE: " << countABOVE << std::endl;
             logging << totalError / leftMatrix.rowNum << "\t" << results.getResultSize() << "\t";
 
-            outputStats();
         }
 
 

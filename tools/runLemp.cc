@@ -81,7 +81,6 @@ inline double decisionRuleBlockedMM(VectorMatrix &q, VectorMatrix &p,
                                     const unsigned long num_users_per_block,
                                     const int K) {
 
-  rg::Timer tt;
   double *user_ptr = q.getMatrixRowPtr(rand_ind);
   double *item_ptr = p.getMatrixRowPtr(0);
   const long m = num_users_per_block;
@@ -92,6 +91,8 @@ inline double decisionRuleBlockedMM(VectorMatrix &q, VectorMatrix &p,
   double *matrix_product = (double *)malloc(m * n * sizeof(double));
   int *top_K_items = (int *)malloc(m * K * sizeof(int));
 
+  rg::Timer tt;
+  tt.start();
   cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, alpha, user_ptr,
               k, item_ptr, k, beta, matrix_product, n);
 
@@ -103,7 +104,7 @@ inline double decisionRuleBlockedMM(VectorMatrix &q, VectorMatrix &p,
   tt.stop();
   free(matrix_product);
   free(top_K_items);
-  return tt.elapsedTime().nanos();
+  return tt.elapsedTime().nanos() / 1E9;
 }
 
 
@@ -204,7 +205,7 @@ int main(int argc, char *argv[]) {
 
     Results results;
     if (args.k > 0) {
-// #ifdef ONLINE_DECISION_RULE
+#ifdef ONLINE_DECISION_RULE
     std::random_device rd; // only used once to initialise (seed) engine
     std::mt19937 rng(
         rd()); // random-number engine used (Mersenne-Twister in this case)
@@ -225,7 +226,7 @@ int main(int argc, char *argv[]) {
     std::memcpy(new_ptr, sample_ptr, num_users_per_block * leftMatrix.colNum * sizeof(double));
 
 
-    VectorMatrix sampleLeftMatrix(sample_ptr, leftMatrix.colNum, leftMatrix.rowNum);
+    VectorMatrix sampleLeftMatrix(new_ptr, leftMatrix.colNum, num_users_per_block);
     
     rg::Timer tt;
     tt.start();
@@ -233,29 +234,30 @@ int main(int argc, char *argv[]) {
     algo.runTopK(sampleLeftMatrix, results);
     tt.stop();
 
-    const double lemp_time = tt.elapsedTime().nanos();
+    const double lemp_time = tt.elapsedTime().nanos() / 1E9;
 
-    cout << "Blocked MM time: " << blocked_mm_time << endl;
-    cout << "LEMP time: " << lemp_time << endl;
+    algo.addSampleStats(blocked_mm_time, lemp_time);
+    cout << "Blocked MM time: " << blocked_mm_time << "s" << endl;
+    cout << "LEMP time: " << lemp_time << "s" << endl;
     if (blocked_mm_time < lemp_time) {
       cout << "Blocked MM wins" << endl;
     } else {
       cout << "LEMP wins" << endl;
-// #ifndef TEST_ONLY
-      // run it on everything else [0-rand_ind), [rand_ind + num_users_per_block, num_users)
-      // and output results
+#ifndef TEST_ONLY
+      // TODO: run it on everything else [0-rand_ind), [rand_ind +
+      // num_users_per_block, num_users) and output results
 
-      // algo.runTopK(leftMatrix, results);
-// #endif
+      algo.runTopK(leftMatrix, results);
+#endif
     }
-// #else
-
-      // algo.runTopK(leftMatrix, results);
-
-// #endif
-
+    algo.outputStats();
+#else
+      algo.runTopK(leftMatrix, results);
+      algo.outputStats();
+#endif
     } else {
         algo.runAboveTheta(leftMatrix, results);
+        algo.outputStats();
     }
     
     if (resultsFile != "") {

@@ -8,6 +8,16 @@ if(SIMD)
   add_definitions(-DWITH_SIMD_INCR)
 endif()
 
+if(RULE)
+  message(STATUS "Adding ONLINE_DECISION_RULE")
+  add_definitions(-DONLINE_DECISION_RULE)
+endif()
+
+if(TEST_ONLY)
+  message(STATUS "Adding TEST_ONLY")
+  add_definitions(-DTEST_ONLY)
+endif()
+
 # add a NativeRelease build type
 if(CMAKE_CXX_COMPILER MATCHES "icc$")
   set( CMAKE_CXX_FLAGS_NATIVERELEASE "-O3 -DNDEBUG" CACHE STRING
@@ -81,13 +91,7 @@ add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 # my own includes/libs
 include_directories(~/packages/include)
 link_directories(~/packages/lib)
-
-
-
-
-
-
-
+link_directories(/usr/lib/openblas-base)
 
 
 # search for boost library
@@ -142,8 +146,5 @@ add_subdirectory(util)
 add_subdirectory(mips)
 add_subdirectory(examples)
 add_subdirectory(tools)
-
-
-
 
 
