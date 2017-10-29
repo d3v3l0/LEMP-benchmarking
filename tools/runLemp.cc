@@ -19,16 +19,93 @@
 //    limitations under the License.
 
 
-//#include <boost/filesystem.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include <iostream>
 #include <mips/mips.h>
 
+#include <cblas.h>
+
+#define L2_CACHE_SIZE 256000
+#define MAX_MEM_SIZE (257840L*1024L*1024L)
 
 using namespace std;
 using namespace mips;
 using namespace boost::program_options;
+
+inline void computeTopRating(double *ratings_matrix, int *top_K_items,
+                             const int num_users, const int num_items) {
+  for (int user_id = 0; user_id < num_users; user_id++) {
+
+    unsigned long index = user_id;
+    index *= num_items;
+    int best_item_id = cblas_idamax(num_items, &ratings_matrix[index], 1);
+    top_K_items[user_id] = best_item_id;
+  }
+}
+
+inline void computeTopK(double *ratings_matrix, int *top_K_items,
+                        const int num_users, const int num_items, const int K) {
+
+  for (int i = 0; i < num_users; i++) {
+
+    std::priority_queue<std::pair<double, int>,
+                        std::vector<std::pair<double, int> >,
+                        std::greater<std::pair<double, int> > > q;
+
+    unsigned long index = i;
+    index *= num_items;
+
+    for (int j = 0; j < K; j++) {
+      q.push(std::make_pair(ratings_matrix[index + j], j));
+    }
+
+    for (int j = K; j < num_items; j++) {
+      if (ratings_matrix[index + j] > q.top().first) {
+        q.pop();
+        q.push(std::make_pair(ratings_matrix[index + j], j));
+      }
+    }
+
+    for (int j = 0; j < K; j++) {
+      const std::pair<double, int> p = q.top();
+      top_K_items[i * K + K - 1 - j] = p.second;
+      q.pop();
+    }
+  }
+}
+
+inline double decisionRuleBlockedMM(VectorMatrix &q, VectorMatrix &p,
+                                    const unsigned int rand_ind,
+                                    const unsigned long num_users_per_block,
+                                    const int K) {
+
+  rg::Timer tt;
+  double *user_ptr = q.getMatrixRowPtr(rand_ind);
+  double *item_ptr = p.getMatrixRowPtr(0);
+  const long m = num_users_per_block;
+  const int n = p.rowNum;
+  const int k = q.colNum;
+  const float alpha = 1.0;
+  const float beta = 0.0;
+  double *matrix_product = (double *)malloc(m * n * sizeof(double));
+  int *top_K_items = (int *)malloc(m * K * sizeof(int));
+
+  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, alpha, user_ptr,
+              k, item_ptr, k, beta, matrix_product, n);
+
+  if (K == 1) {
+    computeTopRating(matrix_product, top_K_items, m, n);
+  } else {
+    computeTopK(matrix_product, top_K_items, m, n, K);
+  }
+  tt.stop();
+  free(matrix_product);
+  free(top_K_items);
+  return tt.elapsedTime().nanos();
+}
+
 
 int main(int argc, char *argv[]) {
     double theta, R, epsilon;
@@ -127,7 +204,56 @@ int main(int argc, char *argv[]) {
 
     Results results;
     if (args.k > 0) {
-        algo.runTopK(leftMatrix, results);
+// #ifdef ONLINE_DECISION_RULE
+    std::random_device rd; // only used once to initialise (seed) engine
+    std::mt19937 rng(
+        rd()); // random-number engine used (Mersenne-Twister in this case)
+    unsigned long num_users_per_block =
+        4 * (L2_CACHE_SIZE / (sizeof(double) * leftMatrix.colNum));
+    while (num_users_per_block*rightMatrix.rowNum*sizeof(double) > MAX_MEM_SIZE) {
+      num_users_per_block /= 2;
+    }
+    std::uniform_int_distribution<int> uni(
+        0, leftMatrix.rowNum - num_users_per_block); // guaranteed unbiased
+    const unsigned int rand_ind = uni(rng);
+
+    const double blocked_mm_time =
+        decisionRuleBlockedMM(leftMatrix, rightMatrix, rand_ind, num_users_per_block, args.k);
+
+    double *sample_ptr = leftMatrix.getMatrixRowPtr(rand_ind);
+    double *new_ptr = (double *)malloc(num_users_per_block * leftMatrix.colNum * sizeof(double));
+    std::memcpy(new_ptr, sample_ptr, num_users_per_block * leftMatrix.colNum * sizeof(double));
+
+
+    VectorMatrix sampleLeftMatrix(sample_ptr, leftMatrix.colNum, leftMatrix.rowNum);
+    
+    rg::Timer tt;
+    tt.start();
+    // sample using rand_ind and num_users_per_block
+    algo.runTopK(sampleLeftMatrix, results);
+    tt.stop();
+
+    const double lemp_time = tt.elapsedTime().nanos();
+
+    cout << "Blocked MM time: " << blocked_mm_time << endl;
+    cout << "LEMP time: " << lemp_time << endl;
+    if (blocked_mm_time < lemp_time) {
+      cout << "Blocked MM wins" << endl;
+    } else {
+      cout << "LEMP wins" << endl;
+// #ifndef TEST_ONLY
+      // run it on everything else [0-rand_ind), [rand_ind + num_users_per_block, num_users)
+      // and output results
+
+      // algo.runTopK(leftMatrix, results);
+// #endif
+    }
+// #else
+
+      // algo.runTopK(leftMatrix, results);
+
+// #endif
+
     } else {
         algo.runAboveTheta(leftMatrix, results);
     }
