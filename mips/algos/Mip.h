@@ -21,6 +21,7 @@ namespace mips {
         double retrievalTime = 0;
         rg::Timer timer;
         comp_type totalComparisons = 0;
+        double user_sample_ratio = 0;
         double blocked_mm_sample_time = 0;
         double lemp_sample_time = 0;
         bool lemp_wins = true;
@@ -61,7 +62,8 @@ namespace mips {
             totalComparisons = 0;
         }
 
-        inline void addSampleStats(const double _blocked_mm_sample_time, const double _lemp_sample_time) {
+        inline void addSampleStats(const double _user_sample_ratio, const double _blocked_mm_sample_time, const double _lemp_sample_time) {
+          user_sample_ratio = _user_sample_ratio;
           blocked_mm_sample_time = _blocked_mm_sample_time;
           lemp_sample_time = _lemp_sample_time;
           lemp_wins = _lemp_sample_time < _blocked_mm_sample_time;
@@ -85,6 +87,7 @@ namespace mips {
             std::cout << "[STATS] total time = " << ((dataPreprocessingTime + tuningTime + retrievalTime) / 1E9) << "s" << std::endl;
             logging << (dataPreprocessingTime + tuningTime + retrievalTime) / 1E9 << "\t";
 
+            logging << user_sample_ratio << "\t";
             logging << blocked_mm_sample_time << "\t";
             logging << lemp_sample_time << "\t";
             logging << std::boolalpha;

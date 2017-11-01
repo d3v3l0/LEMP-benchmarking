@@ -104,12 +104,12 @@ inline double decisionRuleBlockedMM(VectorMatrix &q, VectorMatrix &p,
   tt.stop();
   free(matrix_product);
   free(top_K_items);
-  return tt.elapsedTime().nanos() / 1E9;
+  return (tt.elapsedTime().nanos() / 1E9) / num_users_per_block;
 }
 
 
 int main(int argc, char *argv[]) {
-    double theta, R, epsilon;
+    double theta, R, epsilon, user_sample_ratio;
     string usersFile;
     string itemsFile;
     string logFile, resultsFile;
@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
             ("P", value<string>(&itemsFile), "file containing the probe matrix (right side)")
             ("theta", value<double>(&theta), "theta value")
             ("R", value<double>(&R)->default_value(0.97), "recall parameter for LSH")
+            ("x", value<double>(&user_sample_ratio)->default_value(0.0), "user sample ratio")
 	    ("epsilon", value<double>(&epsilon)->default_value(0.0), "epsilon value for LEMP-LI with Absolute or Relative Approximation")
             ("querySideLeft", value<bool>(&querySideLeft)->default_value(true), "1 if Q^T contains the queries (default). Interesting for Row-Top-k")
             ("isTARR", value<bool>(&isTARR)->default_value(true), "for LEMP-TA. If 1 Round Robin schedule is used (default). Otherwise Max PiQi")
@@ -209,10 +210,16 @@ int main(int argc, char *argv[]) {
     std::random_device rd; // only used once to initialise (seed) engine
     std::mt19937 rng(
         rd()); // random-number engine used (Mersenne-Twister in this case)
-    unsigned long num_users_per_block =
-        4 * (L2_CACHE_SIZE / (sizeof(double) * leftMatrix.colNum));
-    while (num_users_per_block*rightMatrix.rowNum*sizeof(double) > MAX_MEM_SIZE) {
-      num_users_per_block /= 2;
+    unsigned long num_users_per_block = 0;
+    if (user_sample_ratio == 0.0) {
+      // Default
+      num_users_per_block =
+          4 * L2_CACHE_SIZE / (sizeof(double) * leftMatrix.colNum);
+      while (num_users_per_block * rightMatrix.rowNum * sizeof(double) > MAX_MEM_SIZE) {
+        num_users_per_block /= 2;
+      }
+    } else {
+      num_users_per_block = (long)(user_sample_ratio * leftMatrix.rowNum);
     }
     std::uniform_int_distribution<int> uni(
         0, leftMatrix.rowNum - num_users_per_block); // guaranteed unbiased
@@ -234,9 +241,9 @@ int main(int argc, char *argv[]) {
     algo.runTopK(sampleLeftMatrix, results);
     tt.stop();
 
-    const double lemp_time = tt.elapsedTime().nanos() / 1E9;
+    const double lemp_time = (tt.elapsedTime().nanos() / 1E9) / num_users_per_block;
 
-    algo.addSampleStats(blocked_mm_time, lemp_time);
+    algo.addSampleStats(user_sample_ratio, blocked_mm_time, lemp_time);
     cout << "Blocked MM time: " << blocked_mm_time << "s" << endl;
     cout << "LEMP time: " << lemp_time << "s" << endl;
     if (blocked_mm_time < lemp_time) {
