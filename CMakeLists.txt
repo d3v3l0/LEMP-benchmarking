@@ -95,8 +95,8 @@ link_directories(/usr/lib/openblas-base)
 
 
 # search for boost library
-# SET(BOOST_ROOT ~/local) # default
-# SET(Boost_NO_SYSTEM_PATHS TRUE) # needed with cmake on lenny to prevent it grabbing an old system version...
+SET(BOOST_ROOT ~/packages) # default
+SET(Boost_NO_SYSTEM_PATHS TRUE) # needed with cmake on lenny to prevent it grabbing an old system version...
 find_package(Boost  COMPONENTS serialization thread program_options regex filesystem chrono REQUIRED)
 
 message(STATUS "Boost found " ${Boost_LIBRARY_DIRS})
