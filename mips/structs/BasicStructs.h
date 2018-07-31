@@ -37,7 +37,7 @@ namespace mips {
     typedef boost::numeric::ublas::matrix_row<DenseMatrix> MatrixRow;
     typedef DenseMatrix::size_type ta_size_type;
 
-    typedef uint8_t col_type;
+    typedef uint16_t col_type;
     typedef uint32_t row_type;
     typedef uint64_t comp_type;
     typedef uint8_t code_type; // this might need to be changed
